@@ -30,7 +30,7 @@ pub fn build(b: *std.build.Builder) void {
         "-DSEXP_USE_STRICT_TOPLEVEL_BINDINGS=1",
         "-DSEXP_USE_ALIGNED_BYTECODE=1",
         "-DSEXP_USE_STATIC_LIBS=1",
-        "-DSEXP_USE_STATIC_LIBS_NO_INCLUDE=0",
+        "-DSEXP_USE_STATIC_LIBS_NO_INCLUDE=1",
         "-fPIC",
         "-DSEXP_USE_INTTYPES",
         "-DSEXP_USE_DL=0",
@@ -80,7 +80,7 @@ pub fn build(b: *std.build.Builder) void {
         \\     -x chibi.time \
         \\     -x chibi.net \
         \\     -x chibi.filesystem \
-        \\     -x chibi.tty \
+        \\     -x chibi.pty \
         \\     -x chibi.stty \
         \\     -x chibi.system > clibs.c
     , .{
@@ -95,6 +95,7 @@ pub fn build(b: *std.build.Builder) void {
         "bash", "-c", make_clibs_cmd
     });
     wasm_lib.step.dependOn(&make_clibs.step);
+    wasm_lib.addCSourceFile("clibs.c", &c_flags);
 
     const build_wasi = b.step("wasi", "Build a wasi object for linking");
     build_wasi.dependOn(&wasm_lib.step);
