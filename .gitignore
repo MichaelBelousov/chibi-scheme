@@ -69,6 +69,10 @@ lib/srfi/160/uvprims.c
 *.h5
 !index.html
 
+# Zig
+.cache
+zig-cache
+
 benchmarks/gabriel/times.tsv
 examples/snow-fort
 examples/synthcode
