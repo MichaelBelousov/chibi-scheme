@@ -1,9 +1,7 @@
 const std = @import("std");
 
 pub fn build(b: *std.build.Builder) void {
-    // Standard release options allow the person running `zig build` to select
-    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
-    const mode = b.standardReleaseOptions();
+    //const mode = b.standardReleaseOptions();
 
     var webTarget = b.standardTargetOptions(.{});
     webTarget.cpu_arch = .wasm32;
@@ -11,10 +9,11 @@ pub fn build(b: *std.build.Builder) void {
     // maybe should use freestanding? (also doesn't support stdin/err)
     webTarget.os_tag = .wasi;
 
-    const wasm_lib = b.addSharedLibrary("chibi-scheme", "empty.zig", .unversioned);
-    wasm_lib.setTarget(webTarget);
-    wasm_lib.setBuildMode(mode);
+    // TODO: make static lib and add install step, document if doesn't work with wasm
+    const wasm_lib = b.addStaticLibrary("chibi-scheme", "empty.zig");
     wasm_lib.install();
+    wasm_lib.setTarget(webTarget);
+    wasm_lib.setBuildMode(std.builtin.Mode.ReleaseSmall);
 
     // matches Makefile.libs
     const prefix = "/usr/local"; // TODO: std.os.getEnv()
@@ -36,7 +35,7 @@ pub fn build(b: *std.build.Builder) void {
         "-DSEXP_USE_INTTYPES",
         "-DSEXP_USE_DL=0",
         "-Dsexp_so_extension=\".wasm\"", // TODO: import builtin for this
-        "-Dsexp_platform=\"none\"", // TODO: import builtin for this
+        "-Dsexp_platform=\"wasi\"", // TODO: import builtin for this
         "-Dsexp_default_module_path=\"" ++ mod_dir ++ ":" ++ bin_mod_dir ++ "\"", // TODO: use PREFIX/share
         "-Dsexp_version=\"0.10.0\"", // TODO: read VERSION file
         "-Dsexp_release_name=\"neon\"", // TODO: read RELEASE file
@@ -59,8 +58,12 @@ pub fn build(b: *std.build.Builder) void {
     wasm_lib.addIncludePath("./include");
     wasm_lib.linkLibC();
     wasm_lib.linkSystemLibrary("m");
+    // uncomment these and above definitions, to enable not
+    // removing chibi.process and chibi.time modules in build
     //wasm_lib.linkSystemLibrary("wasi-emulated-process-clocks");
     //wasm_lib.linkSystemLibrary("wasi-emulated-signal");
+    //wasm_lib.export_symbol_names = &[_][]const u8{"_main"};
+    wasm_lib.export_table = true;
 
     const make_clibs_cmd = std.fmt.allocPrint(
         b.allocator,
@@ -77,12 +80,14 @@ pub fn build(b: *std.build.Builder) void {
         \\     -x chibi.time \
         \\     -x chibi.net \
         \\     -x chibi.filesystem \
+        \\     -x chibi.tty \
         \\     -x chibi.stty \
         \\     -x chibi.system > clibs.c
     , .{
         //std.os.getenv("LD_LIBRARY_PATH") orelse "",
         //std.os.getenv("DYLD_LIBRARY_PATH") orelse "",
     }) catch unreachable;
+    defer b.allocator.free(make_clibs_cmd);
 
     // FIXME: requires shibi to already be built or in the system
     // FIXME: can we make it depend upon the state of all the .sld files so it doesn't always run?
@@ -90,7 +95,9 @@ pub fn build(b: *std.build.Builder) void {
         "bash", "-c", make_clibs_cmd
     });
     wasm_lib.step.dependOn(&make_clibs.step);
-    wasm_lib.export_symbol_names = &[_][]const u8{"_main"};
+
+    const build_wasi = b.step("wasi", "Build a wasi object for linking");
+    build_wasi.dependOn(&wasm_lib.step);
 
     // const test_step = b.step("test", "Run library tests");
     // test_step.dependOn(&main_tests.step);
