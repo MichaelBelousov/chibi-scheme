@@ -1,22 +1,17 @@
 const std = @import("std");
 
 pub fn build(b: *std.build.Builder) void {
-    //const mode = b.standardReleaseOptions();
-
     var webTarget = b.standardTargetOptions(.{});
     webTarget.cpu_arch = .wasm32;
-    // can't use emscripten target doesn't support a lot of stuff
-    // maybe should use freestanding? (also doesn't support stdin/err)
     webTarget.os_tag = .wasi;
 
-    // TODO: make static lib and add install step, document if doesn't work with wasm
     const wasm_lib = b.addStaticLibrary("chibi-scheme", "empty.zig");
     wasm_lib.install();
     wasm_lib.setTarget(webTarget);
     wasm_lib.setBuildMode(std.builtin.Mode.ReleaseSmall);
 
-    // matches Makefile.libs
-    const prefix = "/usr/local"; // TODO: std.os.getEnv()
+    // loosely matches Makefile.libs
+    const prefix = "/usr/local"; // TODO: std.os.getenv()
     const exec_prefix = prefix;
     const lib_dir = exec_prefix ++ "/lib";
     const data_root_dir = prefix ++ "/share";
@@ -89,8 +84,8 @@ pub fn build(b: *std.build.Builder) void {
     }) catch unreachable;
     defer b.allocator.free(make_clibs_cmd);
 
-    // FIXME: requires shibi to already be built or in the system
-    // FIXME: can we make it depend upon the state of all the .sld files so it doesn't always run?
+    // FIXME: requires chibi to already be built with make, which I am not doing here
+    // FIXME: can we generate dependencies for zig build?
     const make_clibs = b.addSystemCommand(&.{
         "bash", "-c", make_clibs_cmd
     });
@@ -99,7 +94,5 @@ pub fn build(b: *std.build.Builder) void {
 
     const build_wasi = b.step("wasi", "Build a wasi object for linking");
     build_wasi.dependOn(&wasm_lib.step);
-
-    // const test_step = b.step("test", "Run library tests");
-    // test_step.dependOn(&main_tests.step);
 }
+
