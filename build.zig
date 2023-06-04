@@ -42,6 +42,9 @@ pub fn build(b: *std.build.Builder) void {
         "-Dsexp_release_name=\"neon\"", // TODO: read RELEASE file
         "-DSEXP_USE_GREEN_THREADS=0",
         "-DSEXP_USE_MODULES=0",
+        // wasi
+        //"-D_WASI_EMULATED_PROCESS_CLOCKS",
+        //"-D_WASI_EMULATED_SIGNAL",
     };
 
     wasm_lib.addCSourceFile("main.c", &c_flags);
@@ -56,18 +59,26 @@ pub fn build(b: *std.build.Builder) void {
     wasm_lib.addIncludePath("./include");
     wasm_lib.linkLibC();
     wasm_lib.linkSystemLibrary("m");
+    //wasm_lib.linkSystemLibrary("wasi-emulated-process-clocks");
+    //wasm_lib.linkSystemLibrary("wasi-emulated-signal");
 
     const make_clibs_cmd = std.fmt.allocPrint(
         b.allocator,
         // FIXME: assumes git
         \\ git ls-files lib '*.sld' | \
-        //\\   | LD_LIBRARY_PATH=".:{s}" \
-        //\\     DYLD_LIBRARY_PATH=".:{s}" \
+        \\     LD_LIBRARY_PATH="." \
+        \\     DYLD_LIBRARY_PATH="." \
         \\     CHIBI_IGNORE_SYSTEM_PATH=1 \
         \\     CHIBI_MODULE_PATH=lib \
         \\ ./chibi-scheme \
-        \\     -q ./tools/chibi-genstatic > clibs.c
-        \\     -x chibi.emscripten
+        \\     -q ./tools/chibi-genstatic \
+        \\     -x chibi.emscripten \
+        \\     -x chibi.process \
+        \\     -x chibi.time \
+        \\     -x chibi.net \
+        \\     -x chibi.filesystem \
+        \\     -x chibi.stty \
+        \\     -x chibi.system > clibs.c
     , .{
         //std.os.getenv("LD_LIBRARY_PATH") orelse "",
         //std.os.getenv("DYLD_LIBRARY_PATH") orelse "",

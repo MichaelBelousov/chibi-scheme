@@ -70,8 +70,8 @@ lib/srfi/160/uvprims.c
 !index.html
 
 # Zig
-.cache
 zig-cache
+zig-out
 
 benchmarks/gabriel/times.tsv
 examples/snow-fort

@@ -94,7 +94,7 @@ include/chibi/install.h: Makefile.libs Makefile.detect
 	echo '#define sexp_so_extension "'$(SO)'"' > $@
 	echo '#define sexp_default_module_path "'$(MODDIR):$(BINMODDIR):$(SNOWMODDIR):$(SNOWBINMODDIR)'"' >> $@
 	# echo '#define sexp_platform "'$(PLATFORM)'"' >> $@
-	echo '#define sexp_platform "emscripten"' >> $@
+	echo '#define sexp_platform "'$(PLATFORM)'"' >> $@
 	echo '#define sexp_version "'$(CHIBI_VERSION)'"' >> $@
 	echo '#define sexp_release_name "'`cat RELEASE`'"' >> $@
 
