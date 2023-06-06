@@ -35,13 +35,15 @@ pub fn build(b: *std.build.Builder) void {
         "-Dsexp_version=\"0.10.0\"", // TODO: read VERSION file
         "-Dsexp_release_name=\"neon\"", // TODO: read RELEASE file
         "-DSEXP_USE_GREEN_THREADS=0",
-        "-DSEXP_USE_MODULES=0",
+        "-Dsexp_default_module_path=/",
+        // NOTE: can I disable modules and manually load what I need?
+        "-DSEXP_USE_MODULES=1",
         // wasi
         //"-D_WASI_EMULATED_PROCESS_CLOCKS",
         //"-D_WASI_EMULATED_SIGNAL",
     };
 
-    wasm_lib.addCSourceFile("main.c", &c_flags);
+    // wasm_lib.addCSourceFile("main.c", &c_flags); // don't need main for the library
     wasm_lib.addCSourceFile("gc.c", &c_flags);
     wasm_lib.addCSourceFile("sexp.c", &c_flags);
     wasm_lib.addCSourceFile("bignum.c", &c_flags);
@@ -92,7 +94,7 @@ pub fn build(b: *std.build.Builder) void {
     wasm_lib.step.dependOn(&make_clibs.step);
     wasm_lib.addCSourceFile("clibs.c", &c_flags);
 
-    const build_wasi = b.step("wasi", "Build a wasi object for linking");
+    const build_wasi = b.step("wasi", "Build a wasi static library");
     build_wasi.dependOn(&wasm_lib.step);
 }
 
