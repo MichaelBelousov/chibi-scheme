@@ -1,5 +1,43 @@
 const std = @import("std");
 
+const Dirs = struct {
+    pub const prefix = "/usr/local"; // TODO: std.os.getenv()
+    pub const exec_prefix = prefix;
+    pub const lib_dir = exec_prefix ++ "/lib";
+    pub const data_root_dir = prefix ++ "/share";
+    pub const data_dir = data_root_dir;
+    pub const mod_dir = data_dir ++ "/chibi";
+    pub const so_lib_dir = lib_dir;
+    pub const bin_mod_dir = so_lib_dir ++ "/chibi";
+};
+
+pub const c_flags = [_][]const u8{
+    "-DSEXP_USE_STRICT_TOPLEVEL_BINDINGS=1",
+    "-DSEXP_USE_STRICT_TOPLEVEL_BINDINGS=1",
+    "-DSEXP_USE_ALIGNED_BYTECODE=1",
+    "-DSEXP_USE_STATIC_LIBS=1",
+    "-DSEXP_USE_STATIC_LIBS_NO_INCLUDE=1",
+    "-fPIC",
+    "-DSEXP_USE_INTTYPES",
+    "-DSEXP_USE_DL=0",
+    "-Dsexp_so_extension=\".wasm\"", // TODO: import builtin for this
+    "-Dsexp_platform=\"wasi\"", // TODO: import builtin for this
+    "-Dsexp_default_module_path=\"" // TODO: don't need this, it's ignored anyway
+        ++ Dirs.mod_dir ++ ":"
+        ++ Dirs.bin_mod_dir
+        ++ "\"",
+    "-Dsexp_version=\"0.10.0\"", // TODO: read VERSION file
+    "-Dsexp_release_name=\"neon\"", // TODO: read RELEASE file
+    "-DSEXP_USE_GREEN_THREADS=0",
+    "-Dsexp_default_module_path=/",
+    // NOTE: can I disable modules and manually load what I need?
+    "-DSEXP_USE_MODULES=1",
+    // wasi
+    //"-D_WASI_EMULATED_PROCESS_CLOCKS",
+    //"-D_WASI_EMULATED_SIGNAL",
+};
+
+
 pub fn build(b: *std.build.Builder) void {
     var webTarget = b.standardTargetOptions(.{});
     webTarget.cpu_arch = .wasm32;
@@ -10,38 +48,8 @@ pub fn build(b: *std.build.Builder) void {
     wasm_lib.setTarget(webTarget);
     wasm_lib.setBuildMode(std.builtin.Mode.ReleaseSmall);
 
+    // TODO: build
     // loosely matches Makefile.libs
-    const prefix = "/usr/local"; // TODO: std.os.getenv()
-    const exec_prefix = prefix;
-    const lib_dir = exec_prefix ++ "/lib";
-    const data_root_dir = prefix ++ "/share";
-    const data_dir = data_root_dir;
-    const mod_dir = data_dir ++ "/chibi";
-    const so_lib_dir = lib_dir;
-    const bin_mod_dir = so_lib_dir ++ "/chibi";
-
-    const c_flags = [_][]const u8{
-        "-DSEXP_USE_STRICT_TOPLEVEL_BINDINGS=1",
-        "-DSEXP_USE_STRICT_TOPLEVEL_BINDINGS=1",
-        "-DSEXP_USE_ALIGNED_BYTECODE=1",
-        "-DSEXP_USE_STATIC_LIBS=1",
-        "-DSEXP_USE_STATIC_LIBS_NO_INCLUDE=1",
-        "-fPIC",
-        "-DSEXP_USE_INTTYPES",
-        "-DSEXP_USE_DL=0",
-        "-Dsexp_so_extension=\".wasm\"", // TODO: import builtin for this
-        "-Dsexp_platform=\"wasi\"", // TODO: import builtin for this
-        "-Dsexp_default_module_path=\"" ++ mod_dir ++ ":" ++ bin_mod_dir ++ "\"", // TODO: use PREFIX/share
-        "-Dsexp_version=\"0.10.0\"", // TODO: read VERSION file
-        "-Dsexp_release_name=\"neon\"", // TODO: read RELEASE file
-        "-DSEXP_USE_GREEN_THREADS=0",
-        "-Dsexp_default_module_path=/",
-        // NOTE: can I disable modules and manually load what I need?
-        "-DSEXP_USE_MODULES=1",
-        // wasi
-        //"-D_WASI_EMULATED_PROCESS_CLOCKS",
-        //"-D_WASI_EMULATED_SIGNAL",
-    };
 
     // wasm_lib.addCSourceFile("main.c", &c_flags); // don't need main for the library
     wasm_lib.addCSourceFile("gc.c", &c_flags);
