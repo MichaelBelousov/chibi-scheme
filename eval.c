@@ -1413,12 +1413,26 @@ static struct sexp_library_entry_t *sexp_find_static_library(const char *file)
   base_len = strlen(file) - strlen(sexp_so_extension);
   if (strcmp(file + base_len, sexp_so_extension))
     return NULL;
+
+
   for (table = sexp_static_libraries;
        table;
        table = (struct sexp_library_entry_t*)entry->init) {
-    for (entry = &table[0]; entry->name; entry++)
+    for (entry = &table[0]; entry->name; entry++) {
+#if SEXP_USE_STATIC_LIBS
+      char end_matches = 1;
+      for (char *p_entry = entry->name + strlen(entry->name) - 1,
+                *p_file = file + base_len - 1
+          ; p_entry >= entry->name && p_file >= file
+          ; --p_entry, --p_file)
+          if (*p_entry != *p_file) { end_matches = 0; break; }
+
+      if (end_matches)
+#else
       if (! strncmp(file, entry->name, base_len))
+#endif
         return entry;
+    }
   }
   return NULL;
 }
