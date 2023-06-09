@@ -32,6 +32,8 @@ pub const c_flags = [_][]const u8{
     "-Dsexp_default_module_path=/",
     // NOTE: can I disable modules and manually load what I need?
     "-DSEXP_USE_MODULES=1",
+    "-DSEXP_USE_UTF8_STRINGS=1", // can't disable while keeping json and bytevector modules?
+    //"-DSEXP_USE_STRING_INDEX_TABLE=1",
     // wasi
     //"-D_WASI_EMULATED_PROCESS_CLOCKS",
     //"-D_WASI_EMULATED_SIGNAL",
