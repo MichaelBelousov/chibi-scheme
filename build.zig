@@ -1,4 +1,5 @@
 const std = @import("std");
+const path = std.fs.path;
 
 const Dirs = struct {
     pub const prefix = "/usr/local"; // TODO: std.os.getenv()
@@ -39,42 +40,33 @@ pub const c_flags = [_][]const u8{
     //"-D_WASI_EMULATED_SIGNAL",
 };
 
+pub fn libPkgStep(b: *std.build.Builder, rel_path: []const u8) !*std.build.LibExeObjStep {
+    const aloc = b.allocator;
+    const lib = b.addStaticLibrary("chibi-scheme", try path.join(aloc, &.{rel_path, "empty.zig"}));
 
-pub fn build(b: *std.build.Builder) void {
-    var webTarget = b.standardTargetOptions(.{});
-    webTarget.cpu_arch = .wasm32;
-    webTarget.os_tag = .wasi;
-
-    const wasm_lib = b.addStaticLibrary("chibi-scheme", "empty.zig");
-    wasm_lib.install();
-    wasm_lib.setTarget(webTarget);
-    wasm_lib.setBuildMode(std.builtin.Mode.ReleaseSmall);
-
-    // TODO: build
     // loosely matches Makefile.libs
-
-    // wasm_lib.addCSourceFile("main.c", &c_flags); // don't need main for the library
-    wasm_lib.addCSourceFile("gc.c", &c_flags);
-    wasm_lib.addCSourceFile("sexp.c", &c_flags);
-    wasm_lib.addCSourceFile("bignum.c", &c_flags);
-    wasm_lib.addCSourceFile("gc_heap.c", &c_flags);
-    wasm_lib.addCSourceFile("opcodes.c", &c_flags);
-    wasm_lib.addCSourceFile("vm.c", &c_flags);
-    wasm_lib.addCSourceFile("eval.c", &c_flags);
-    wasm_lib.addCSourceFile("simplify.c", &c_flags);
-    wasm_lib.addIncludePath("./include");
-    wasm_lib.linkLibC();
-    wasm_lib.linkSystemLibrary("m");
-    // uncomment these and above definitions, to enable not
+    // don't need main for the library
+    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "gc.c"}), &c_flags);
+    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "sexp.c"}), &c_flags);
+    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "bignum.c"}), &c_flags);
+    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "gc_heap.c"}), &c_flags);
+    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "opcodes.c"}), &c_flags);
+    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "vm.c"}), &c_flags);
+    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "eval.c"}), &c_flags);
+    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "simplify.c"}), &c_flags);
+    lib.addIncludePath(try path.join(aloc, &.{rel_path, "./include"}));
+    lib.linkLibC();
+    lib.linkSystemLibrary("m");
+    // uncomment these and above in c_flags, to enable not
     // removing chibi.process and chibi.time modules in build
     //wasm_lib.linkSystemLibrary("wasi-emulated-process-clocks");
     //wasm_lib.linkSystemLibrary("wasi-emulated-signal");
     //wasm_lib.export_symbol_names = &[_][]const u8{"_main"};
-    wasm_lib.export_table = true;
+    lib.export_table = true;
 
     const make_clibs_cmd = std.fmt.allocPrint(
         b.allocator,
-        // FIXME: assumes git
+        \\ cd {s} &&
         \\ git ls-files lib '*.sld' | \
         \\     LD_LIBRARY_PATH="." \
         \\     DYLD_LIBRARY_PATH="." \
@@ -90,10 +82,8 @@ pub fn build(b: *std.build.Builder) void {
         \\     -x chibi.pty \
         \\     -x chibi.stty \
         \\     -x chibi.system > clibs.c
-    , .{
-        //std.os.getenv("LD_LIBRARY_PATH") orelse "",
-        //std.os.getenv("DYLD_LIBRARY_PATH") orelse "",
-    }) catch unreachable;
+    , .{ rel_path }) catch unreachable;
+
     defer b.allocator.free(make_clibs_cmd);
 
     // FIXME: requires chibi to already be built with make, which I am not doing here
@@ -101,10 +91,22 @@ pub fn build(b: *std.build.Builder) void {
     const make_clibs = b.addSystemCommand(&.{
         "bash", "-c", make_clibs_cmd
     });
-    wasm_lib.step.dependOn(&make_clibs.step);
-    wasm_lib.addCSourceFile("clibs.c", &c_flags);
+    lib.step.dependOn(&make_clibs.step);
+    // NOTE: generated file
+    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "clibs.c"}), &c_flags);
 
-    const build_wasi = b.step("wasi", "Build a wasi static library");
-    build_wasi.dependOn(&wasm_lib.step);
+    return lib;
+}
+
+pub fn build(b: *std.build.Builder) void {
+    var webTarget = b.standardTargetOptions(.{});
+    webTarget.cpu_arch = .wasm32;
+    webTarget.os_tag = .wasi;
+
+    const lib = libPkgStep(b, ".");
+    lib.setTarget(b.standardTargetOptions(.{}));
+    lib.setBuildMode(b.standardReleaseOptions(.{}));
+
+    lib.install();
 }
 
