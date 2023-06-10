@@ -374,7 +374,7 @@
 
 (define (init-c-lib lib)
   (display "  { \"")
-  (display (car lib))
+  (display (substring (car lib) 4))
   (display "\", ")
   (display (init-name (cdr lib)))
   (display " },\n"))
