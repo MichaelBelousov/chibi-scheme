@@ -12,7 +12,7 @@ const Dirs = struct {
     pub const bin_mod_dir = so_lib_dir ++ "/chibi";
 };
 
-pub const c_flags = [_][]const u8{
+const release_c_flags = [_][]const u8{
     "-DSEXP_USE_STRICT_TOPLEVEL_BINDINGS=1",
     "-DSEXP_USE_STRICT_TOPLEVEL_BINDINGS=1",
     "-DSEXP_USE_ALIGNED_BYTECODE=1",
@@ -31,14 +31,30 @@ pub const c_flags = [_][]const u8{
     "-Dsexp_release_name=\"neon\"", // TODO: read RELEASE file
     "-DSEXP_USE_GREEN_THREADS=0",
     "-Dsexp_default_module_path=/",
-    // NOTE: can I disable modules and manually load what I need?
-    "-DSEXP_USE_MODULES=1",
+    "-DSEXP_USE_MODULES=1", // seems like images are shared objects only so I need modules
     "-DSEXP_USE_UTF8_STRINGS=1", // can't disable while keeping json and bytevector modules?
+    // sexp_read_number seems to hit undefined behavior that I don't care about solving
+    "-fno-sanitize=undefined",
     //"-DSEXP_USE_STRING_INDEX_TABLE=1",
     // wasi
     //"-D_WASI_EMULATED_PROCESS_CLOCKS",
     //"-D_WASI_EMULATED_SIGNAL",
 };
+
+const debug_c_flags = release_c_flags ++ [_][]const u8{
+    //"-DSEXP_USE_DEBUG_GC=1", // disabled because annoying, need to expose this as an option
+};
+
+pub fn getCFlags(b: *std.build.Builder) []const []const u8 {
+    return if (b.release_mode orelse .Debug == .Debug) &debug_c_flags else &release_c_flags;
+}
+
+pub fn getCFlagsComp(comptime mode: std.builtin.Mode)
+    //@TypeOf(if (mode == .Debug) debug_c_flags else release_c_flags) {
+    []const []const u8 {
+    return if (mode == .Debug) &debug_c_flags else &release_c_flags;
+}
+
 
 pub fn libPkgStep(b: *std.build.Builder, rel_path: []const u8) !*std.build.LibExeObjStep {
     const aloc = b.allocator;
@@ -46,14 +62,14 @@ pub fn libPkgStep(b: *std.build.Builder, rel_path: []const u8) !*std.build.LibEx
 
     // loosely matches Makefile.libs
     // don't need main for the library
-    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "gc.c"}), &c_flags);
-    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "sexp.c"}), &c_flags);
-    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "bignum.c"}), &c_flags);
-    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "gc_heap.c"}), &c_flags);
-    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "opcodes.c"}), &c_flags);
-    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "vm.c"}), &c_flags);
-    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "eval.c"}), &c_flags);
-    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "simplify.c"}), &c_flags);
+    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "gc.c"}), getCFlags(b));
+    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "sexp.c"}), getCFlags(b));
+    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "bignum.c"}), getCFlags(b));
+    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "gc_heap.c"}), getCFlags(b));
+    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "opcodes.c"}), getCFlags(b));
+    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "vm.c"}), getCFlags(b));
+    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "eval.c"}), getCFlags(b));
+    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "simplify.c"}), getCFlags(b));
     lib.addIncludePath(try path.join(aloc, &.{rel_path, "./include"}));
     lib.linkLibC();
     lib.linkSystemLibrary("m");
@@ -93,19 +109,15 @@ pub fn libPkgStep(b: *std.build.Builder, rel_path: []const u8) !*std.build.LibEx
     });
     lib.step.dependOn(&make_clibs.step);
     // NOTE: generated file
-    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "clibs.c"}), &c_flags);
+    lib.addCSourceFile(try path.join(aloc, &.{rel_path, "clibs.c"}), getCFlags(b));
 
     return lib;
 }
 
-pub fn build(b: *std.build.Builder) void {
-    var webTarget = b.standardTargetOptions(.{});
-    webTarget.cpu_arch = .wasm32;
-    webTarget.os_tag = .wasi;
-
-    const lib = libPkgStep(b, ".");
+pub fn build(b: *std.build.Builder) !void {
+    const lib = try libPkgStep(b, ".");
     lib.setTarget(b.standardTargetOptions(.{}));
-    lib.setBuildMode(b.standardReleaseOptions(.{}));
+    lib.setBuildMode(b.standardReleaseOptions());
 
     lib.install();
 }
